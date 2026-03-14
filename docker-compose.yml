@@ -1,0 +1,47 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: transactiwar-web
+    ports:
+      - "8080:80"
+      - "8443:443"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - profile_uploads:/var/www/uploads/profiles
+    networks:
+      - transactiwar-net
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    container_name: transactiwar-db
+    env_file:
+      - .env
+    # SECURITY: No port mapping — MySQL is only accessible via internal Docker network
+    # This prevents direct database access from the host or external attackers
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - transactiwar-net
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  profile_uploads:
+
+networks:
+  transactiwar-net:
+    driver: bridge
