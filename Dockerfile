@@ -26,6 +26,8 @@ RUN mkdir -p /etc/apache2/ssl && \
     -out /etc/apache2/ssl/server.crt \
     -subj "/C=IN/ST=Telangana/L=Hyderabad/O=TransactiWar/OU=CS6903/CN=transactiwar.local" \
     -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:10.96.0.74" && \
+    chmod 600 /etc/apache2/ssl/server.key && \
+    chmod 644 /etc/apache2/ssl/server.crt
 
 # Copy Apache configuration
 COPY apache.conf /etc/apache2/sites-available/000-default.conf
