@@ -39,22 +39,22 @@ if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
 fi
 
 # Initialize database tables (safe to run multiple times due to IF NOT EXISTS)
-echo "Ensuring database tables exist..."
-php -r "
-    try {
-        \$pdo = new PDO(
-            'mysql:host=' . getenv('DB_HOST') . ';charset=utf8mb4',
-            getenv('DB_USER'),
-            getenv('DB_PASS'),
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-        );
-        \$sql = file_get_contents('/var/www/html/init.sql');
-        \$pdo->exec(\$sql);
-        echo \"Database tables initialized successfully.\n\";
-    } catch (PDOException \$e) {
-        echo \"Database init note: \" . \$e->getMessage() . \"\n\";
-    }
-" 2>&1 || true
+# echo "Ensuring database tables exist..."
+# php -r "
+#     try {
+#         \$pdo = new PDO(
+#             'mysql:host=' . getenv('DB_HOST') . ';charset=utf8mb4',
+#             getenv('DB_USER'),
+#             getenv('DB_PASS'),
+#             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+#         );
+#         \$sql = file_get_contents('/var/www/html/init.sql');
+#         \$pdo->exec(\$sql);
+#         echo \"Database tables initialized successfully.\n\";
+#     } catch (PDOException \$e) {
+#         echo \"Database init note: \" . \$e->getMessage() . \"\n\";
+#     }
+# " 2>&1 || true
 
 echo "Starting Apache..."
 exec apache2-foreground
