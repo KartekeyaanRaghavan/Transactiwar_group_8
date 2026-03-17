@@ -38,9 +38,9 @@ define('LOGIN_USERNAME_WINDOW', 21600); // 6 hours in seconds
 define('MAX_REGISTER_ATTEMPTS', 5);
 define('REGISTER_RATE_LIMIT_WINDOW', 3600); // 1 hour in seconds
 
-// CAPTCHA: show math CAPTCHA after this many failures from the same IP
+// CAPTCHA: show image CAPTCHA after this many failures from the same IP
 define('CAPTCHA_THRESHOLD', 3);
-define('CAPTCHA_VALIDITY', 300); // 5 minutes
+define('CAPTCHA_VALIDITY', 300); // 5 minutes — session answer expires after this
 
 /**
  * Register a new user.
@@ -298,41 +298,37 @@ function getRecentFailedAttemptCountByIP(string $ip): int {
 }
 
 /**
- * Generate a math CAPTCHA challenge.
- * Returns the question text, a timestamp, and an HMAC token binding the answer.
- * No external libraries required — uses HMAC to prevent tampering.
+ * Verify a CAPTCHA answer against the server-side session value.
  *
- * @return array ['question' => string, 'timestamp' => int, 'token' => string]
- */
-function generateCaptcha(): array {
-    $a = random_int(1, 15);
-    $b = random_int(1, 15);
-    $answer = $a + $b;
-    $question = "What is {$a} + {$b}?";
-    $timestamp = time();
-    $token = hash_hmac('sha256', $timestamp . '|' . $answer, HMAC_SECRET);
-    return [
-        'question'  => $question,
-        'timestamp' => $timestamp,
-        'token'     => $token,
-    ];
-}
-
-/**
- * Verify a CAPTCHA answer against the HMAC-signed token.
+ * The answer is stored in a PHP native session by public/captcha.php and is
+ * never sent to the client, so it cannot be read from the HTML and scripted.
+ * The answer is cleared after the first verification attempt (one-time use).
  *
- * @param string $userAnswer  The user's submitted answer
- * @param string $timestamp   The timestamp from the hidden field
- * @param string $token       The HMAC token from the hidden field
+ * @param string $userAnswer The user's submitted answer
  * @return bool True if correct and not expired
  */
-function verifyCaptcha(string $userAnswer, string $timestamp, string $token): bool {
-    // Check expiry
-    if (time() - (int)$timestamp > CAPTCHA_VALIDITY) {
+function verifyCaptcha(string $userAnswer): bool {
+    session_name('TWCAP');
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    if (!isset($_SESSION['captcha_answer'], $_SESSION['captcha_ts'])) {
         return false;
     }
-    $expected = hash_hmac('sha256', $timestamp . '|' . trim($userAnswer), HMAC_SECRET);
-    return hash_equals($expected, $token);
+
+    // Check expiry
+    if (time() - (int)$_SESSION['captcha_ts'] > CAPTCHA_VALIDITY) {
+        unset($_SESSION['captcha_answer'], $_SESSION['captcha_ts']);
+        return false;
+    }
+
+    $correct = ((int)trim($userAnswer) === (int)$_SESSION['captcha_answer']);
+
+    // One-time use — clear regardless of whether the answer was right or wrong
+    unset($_SESSION['captcha_answer'], $_SESSION['captcha_ts']);
+
+    return $correct;
 }
 
 function checkAndRecordRegisterAttempt(string $ip): bool {

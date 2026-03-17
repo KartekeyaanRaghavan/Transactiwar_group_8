@@ -4,7 +4,7 @@
  *
  * Security measures:
  * - Input validation (username, email, password strength)
- * - Password hashed with bcrypt
+ * - Password hashed with Argon2id
  * - CSRF protection
  * - XSS prevention via output encoding
  * - SQL injection prevented via prepared statements

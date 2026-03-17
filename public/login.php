@@ -5,7 +5,7 @@
  * Security measures:
  * - Rate limiting on login attempts (per IP)
  * - Generic error messages (no username/email enumeration)
- * - Timing-safe password comparison (bcrypt)
+ * - Timing-safe password comparison (Argon2id)
  * - Session fixation prevention (new token on login)
  * - CSRF protection via cookie-based double-submit pattern (pre-session)
  */
@@ -52,12 +52,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (empty($username) || empty($password)) {
         $errorMessage = 'Please enter both username and password.';
     } elseif ($captchaRequired) {
-        // SECURITY: Verify CAPTCHA before attempting login
+        // SECURITY: Verify image CAPTCHA before attempting login
         $captchaAnswer = trim($_POST['captcha_answer'] ?? '');
-        $captchaTs     = (string)($_POST['captcha_ts'] ?? '');
-        $captchaToken  = (string)($_POST['captcha_token'] ?? '');
 
-        if (empty($captchaAnswer) || !verifyCaptcha($captchaAnswer, $captchaTs, $captchaToken)) {
+        if (empty($captchaAnswer) || !verifyCaptcha($captchaAnswer)) {
             $errorMessage = 'Incorrect or expired CAPTCHA. Please try again.';
         } else {
             $result = loginUser($username, $password);
@@ -91,8 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $captchaRequired = ($ipFailures >= CAPTCHA_THRESHOLD);
 }
 
-// Generate CAPTCHA if required
-$captcha = $captchaRequired ? generateCaptcha() : null;
+// Cache-busting nonce so the browser always fetches a fresh captcha image
+$captchaNonce = $captchaRequired ? random_int(100000, 999999) : null;
 
 // Generate login CSRF token (cookie-based double-submit)
 $loginCsrfToken = generateLoginCSRFToken();
@@ -132,16 +130,18 @@ require_once APP_ROOT . '/templates/header.php';
                        placeholder="Enter your password">
             </div>
 
-            <?php if ($captcha): ?>
-                <!-- SECURITY: Math CAPTCHA shown after <?php echo CAPTCHA_THRESHOLD; ?> failed attempts from this IP -->
+            <?php if ($captchaNonce): ?>
+                <!-- SECURITY: Image CAPTCHA shown after <?php echo CAPTCHA_THRESHOLD; ?> failed attempts from this IP.
+                     Answer is stored server-side only — never in the HTML. -->
                 <div class="form-group">
-                    <label for="captcha_answer" class="form-label"><?php echo sanitizeOutput($captcha['question']); ?></label>
-                    <input type="number" id="captcha_answer" name="captcha_answer" class="form-input"
-                           required placeholder="Enter your answer"
-                           autocomplete="off">
-                    <input type="hidden" name="captcha_ts" value="<?php echo (int)$captcha['timestamp']; ?>">
-                    <input type="hidden" name="captcha_token" value="<?php echo sanitizeOutput($captcha['token']); ?>">
-                    <div class="form-hint">Please solve this to verify you are human.</div>
+                    <label class="form-label">Solve the challenge to continue</label>
+                    <img src="/captcha.php?v=<?php echo $captchaNonce; ?>"
+                         alt="CAPTCHA challenge"
+                         style="display:block;margin-bottom:8px;border:1px solid #ccc;border-radius:4px;">
+                    <input type="text" id="captcha_answer" name="captcha_answer" class="form-input"
+                           required placeholder="Enter the answer"
+                           autocomplete="off" inputmode="numeric">
+                    <div class="form-hint">Enter the numeric result of the expression shown above.</div>
                 </div>
             <?php endif; ?>
 
