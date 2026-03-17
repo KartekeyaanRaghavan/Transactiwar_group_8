@@ -8,7 +8,7 @@
 |------|-------------|
 | Kartekeyaan Raghavan | CS25MTECH14019 |
 | Rohit Sinha | CS25MTECH11018 |
-| Shinde Atharv Suhas | CS25MTECH11008 |
+| Shinde Atharv Suhas | CS25MTECH11006 |
 | Shivansh Agarwal | CS25MTECH14013 |
 | Dayyala Vamsi Krishna | CS25MTECH11027 |
 
