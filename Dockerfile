@@ -34,6 +34,9 @@ COPY apache.conf /etc/apache2/sites-available/000-default.conf
 
 # Copy application code
 COPY . /var/www/html/
+# SECURITY: Remove infrastructure script from the web root — pulled in by the bulk
+# COPY above. The canonical copy lives at /usr/local/bin/ (copied explicitly below).
+RUN rm -f /var/www/html/wait-for-db.sh
 
 # Set the document root to the public directory
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
@@ -56,7 +59,7 @@ RUN rm -f /var/www/html/.env
 
 # SECURITY: Disable PHP functions that are dangerous
 # Note: We keep most functions enabled but disable the most dangerous ones
-RUN echo "disable_functions = exec,passthru,shell_exec,system,proc_open,popen,parse_ini_file,show_source" >> /usr/local/etc/php/conf.d/security.ini \
+RUN echo "disable_functions = exec,passthru,shell_exec,system,proc_open,popen,parse_ini_file,show_source,mail,pcntl_exec,dl,putenv,proc_nice,proc_get_status" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "expose_php = Off" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "display_errors = Off" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "log_errors = On" >> /usr/local/etc/php/conf.d/security.ini \

@@ -36,7 +36,9 @@ if (checkAndRecordPageViewAttempt($session['user_id'])) {
 
 // Pagination
 $perPage = 20;
-$page = max(1, (int) ($_GET['page'] ?? 1));
+// SECURITY: Cap page number to prevent expensive OFFSET scans on large tables
+// (e.g., ?page=999999999 → MySQL must skip ~20 billion rows via index scan)
+$page = min(max(1, (int) ($_GET['page'] ?? 1)), 1000);
 $offset = ($page - 1) * $perPage;
 
 // Get transactions

@@ -164,6 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $session['balance'] = $user['balance'];
                             } else {
                                 $errorMessage = $transferResult['error'];
+                                logActivity('transfer.php (failed)', $session);
                             }
                         }
                     }

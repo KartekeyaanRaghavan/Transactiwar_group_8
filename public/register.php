@@ -45,33 +45,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // SECURITY: Validate registration CSRF token (double-submit cookie pattern)
     if (!validateLoginCSRFToken($csrfToken)) {
         $errorMessage = 'Invalid request. Please refresh the page and try again.';
-    } elseif ($password !== $confirmPassword) {
-        $errorMessage = 'Passwords do not match.';
     } else {
-        // Register the user (validation is done inside registerUser)
-        $result = registerUser($username, $email, $password);
-
-        if ($result['success']) {
-            // Clear the CSRF cookie after successful registration
-            clearLoginCSRFCookie();
-
-            // Log activity
-            logActivity('register.php (success)', null);
-
-            // Redirect to login with success message
-            // SECURITY: Using a session flash message would be better,
-            // but since user isn't logged in yet, we use a query parameter.
-            // The parameter value is fixed, not user-controlled, so no XSS risk.
-            header('Location: /login.php?registered=1');
-            exit;
+        // SECURITY: Always verify CAPTCHA on registration to prevent:
+        // - Sybil attacks (mass fake accounts via VPN rotation / botnet)
+        // - Balance inflation (each account starts with Rs. 100)
+        // - User ID enumeration (register, observe ID, infer total users)
+        $captchaAnswer = trim($_POST['captcha_answer'] ?? '');
+        if (empty($captchaAnswer) || !verifyCaptcha($captchaAnswer)) {
+            $errorMessage = 'Incorrect or expired CAPTCHA. Please try again.';
+        } elseif ($password !== $confirmPassword) {
+            $errorMessage = 'Passwords do not match.';
         } else {
-            $errorMessage = $result['error'];
+            // Register the user (validation is done inside registerUser)
+            $result = registerUser($username, $email, $password);
+
+            if ($result['success']) {
+                // Clear the CSRF cookie after successful registration
+                clearLoginCSRFCookie();
+
+                // Log activity
+                logActivity('register.php (success)', null);
+
+                // Redirect to login with success message
+                // SECURITY: Using a session flash message would be better,
+                // but since user isn't logged in yet, we use a query parameter.
+                // The parameter value is fixed, not user-controlled, so no XSS risk.
+                header('Location: /login.php?registered=1');
+                exit;
+            } else {
+                $errorMessage = $result['error'];
+            }
         }
     }
 }
 
 // Generate registration CSRF token (cookie-based double-submit)
 $registerCsrfToken = generateLoginCSRFToken();
+
+// Cache-busting nonce so the browser always fetches a fresh captcha image
+$captchaNonce = random_int(100000, 999999);
 
 // SECURITY: Only log page view on GET — POST outcomes are already logged above
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -124,6 +136,19 @@ require_once APP_ROOT . '/templates/header.php';
                 <input type="password" id="confirm_password" name="confirm_password" class="form-input"
                        required minlength="8" maxlength="72"
                        placeholder="Confirm your password">
+            </div>
+
+            <!-- SECURITY: CAPTCHA required on every registration to prevent Sybil attacks.
+                 Answer is stored server-side only — never in the HTML. -->
+            <div class="form-group">
+                <label class="form-label">Solve the challenge to continue</label>
+                <img src="/captcha.php?v=<?php echo $captchaNonce; ?>"
+                     alt="CAPTCHA challenge"
+                     style="display:block;margin-bottom:8px;border:1px solid #ccc;border-radius:4px;">
+                <input type="text" id="captcha_answer" name="captcha_answer" class="form-input"
+                       required placeholder="Enter the answer"
+                       autocomplete="off" inputmode="numeric">
+                <div class="form-hint">Enter the numeric result of the expression shown above.</div>
             </div>
 
             <button type="submit" class="btn btn-primary btn-block">Create Account</button>
