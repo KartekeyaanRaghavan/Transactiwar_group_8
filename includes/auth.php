@@ -262,13 +262,6 @@ function invalidateAllSessionsForUser(int $userId): void {
 }
 
 /**
- * Atomically check and record a registration attempt.
- * Uses SELECT ... FOR UPDATE inside a transaction to eliminate TOCTOU.
- *
- * @param string $ip
- * @return bool True if rate limited (registration should be blocked)
- */
-/**
  * Get the count of recent failed login attempts for a specific IP + username pair.
  * Used for progressive login delay.
  *

@@ -25,9 +25,9 @@ function setSecurityHeaders(): void {
     header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
 
     // Content Security Policy: restrict resource loading
-    // No 'unsafe-inline' — all styles are in external CSS files (style.css utility classes)
-    // Google Fonts allowed for Inter font family
-    header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'");
+    // No 'unsafe-inline' — all styles are in external CSS files
+    // Fonts are self-hosted — no external CDN dependencies
+    header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'");
 
     // Permissions policy
     header('Permissions-Policy: camera=(), microphone=(), geolocation=()');

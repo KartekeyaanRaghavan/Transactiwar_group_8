@@ -5,9 +5,64 @@
  * Generates a distorted GD image of a math challenge.
  * The answer is stored server-side in a PHP native session — it is never sent to the client.
  * Supports +, -, and × operations to prevent trivial scripted solving.
+ *
+ * Security:
+ * - Rate limited per IP (30 requests per minute) to prevent DoS via CPU-intensive GD rendering
  */
 
 define('APP_ROOT', dirname(__DIR__));
+
+require_once APP_ROOT . '/config/database.php';
+
+// SECURITY: Rate limit captcha generation per IP to prevent DoS
+// Each request creates a GD image (CPU cost) and a PHP session file (disk I/O)
+$captchaIp = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+$captchaRateLimited = false;
+
+try {
+    $pdo = getDBConnection();
+    $pdo->beginTransaction();
+
+    $stmt = $pdo->prepare(
+        'SELECT id, attempts FROM rate_limits
+         WHERE ip_address = :ip AND action = :action
+         AND first_attempt > DATE_SUB(NOW(), INTERVAL 60 SECOND)
+         FOR UPDATE'
+    );
+    $stmt->execute([':ip' => $captchaIp, ':action' => 'captcha']);
+    $record = $stmt->fetch();
+
+    if ($record && (int)$record['attempts'] >= 30) {
+        $captchaRateLimited = true;
+    } elseif ($record) {
+        $pdo->prepare('UPDATE rate_limits SET attempts = attempts + 1, last_attempt = NOW() WHERE id = :id')
+            ->execute([':id' => $record['id']]);
+    } else {
+        $pdo->prepare('INSERT INTO rate_limits (ip_address, action, attempts, first_attempt) VALUES (:ip, :action, 1, NOW())')
+            ->execute([':ip' => $captchaIp, ':action' => 'captcha']);
+    }
+
+    $pdo->commit();
+} catch (PDOException $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    // Fail open — don't block captcha if rate limiting DB fails
+}
+
+if ($captchaRateLimited) {
+    http_response_code(429);
+    // Return a 1x1 transparent PNG instead of generating an expensive image
+    header('Content-Type: image/png');
+    header('Cache-Control: no-store');
+    $tiny = imagecreatetruecolor(1, 1);
+    imagesavealpha($tiny, true);
+    $transparent = imagecolorallocatealpha($tiny, 0, 0, 0, 127);
+    imagefill($tiny, 0, 0, $transparent);
+    imagepng($tiny);
+    imagedestroy($tiny);
+    exit;
+}
 
 // Dedicated session name to avoid conflicts with the app's DB-based session system
 session_name('TWCAP');
