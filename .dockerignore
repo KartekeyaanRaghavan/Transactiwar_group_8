@@ -1,0 +1,9 @@
+# Docker ignore file
+.env
+*.md
+*.pdf
+*.docx
+*.txt
+*.png
+.git
+.gitignore

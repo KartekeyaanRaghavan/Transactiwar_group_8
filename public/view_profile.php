@@ -23,6 +23,15 @@ setSecurityHeaders();
 
 $session = requireAuth();
 
+if (checkAndRecordProfileViewAttempt($session['user_id'])) {
+    http_response_code(429);
+    $pageTitle = 'Too Many Requests';
+    require_once APP_ROOT . '/templates/header.php';
+    echo '<div class="card"><div class="empty-state"><h3>Too many requests</h3><p>Please wait before viewing more profiles.</p></div></div>';
+    require_once APP_ROOT . '/templates/footer.php';
+    exit;
+}
+
 // Get fresh balance for navbar
 $currentUser = getUserById($session['user_id']);
 if ($currentUser) {

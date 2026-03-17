@@ -227,6 +227,10 @@ function checkAndRecordTransferAttempt(int $userId): bool {
 define('MAX_PAGE_VIEW_ATTEMPTS', 60);
 define('PAGE_VIEW_RATE_LIMIT_WINDOW', 60); // 60 page-loads per minute per user
 
+// Profile-view rate limiting: stricter limit to prevent user ID enumeration
+define('MAX_PROFILE_VIEW_ATTEMPTS', 20);
+define('PROFILE_VIEW_RATE_LIMIT_WINDOW', 60); // 20 profile views per minute per user
+
 /**
  * Atomically check and record a page-view request for authenticated read-only pages.
  * Prevents enumeration and DoS on pages that trigger DB queries.
@@ -272,6 +276,55 @@ function checkAndRecordPageViewAttempt(int $userId): bool {
     } catch (PDOException $e) {
         $pdo->rollBack();
         error_log('Page-view rate limit error: ' . $e->getMessage());
+        return false; // fail open on error
+    }
+}
+
+/**
+ * Atomically check and record a profile-view request.
+ * Stricter than the general page-view limit to prevent sequential user ID enumeration.
+ * Uses SELECT ... FOR UPDATE inside a transaction to eliminate TOCTOU.
+ *
+ * @param int $userId Authenticated user ID
+ * @return bool True if rate limited (request should be blocked)
+ */
+function checkAndRecordProfileViewAttempt(int $userId): bool {
+    $pdo = getDBConnection();
+    $identifier = 'user:' . $userId;
+
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT id, attempts FROM rate_limits
+             WHERE ip_address = :identifier AND action = :action
+             AND first_attempt > DATE_SUB(NOW(), INTERVAL :window SECOND)
+             FOR UPDATE'
+        );
+        $stmt->execute([
+            ':identifier' => $identifier,
+            ':action'     => 'profile_view',
+            ':window'     => PROFILE_VIEW_RATE_LIMIT_WINDOW,
+        ]);
+        $record = $stmt->fetch();
+
+        if ($record && (int) $record['attempts'] >= MAX_PROFILE_VIEW_ATTEMPTS) {
+            $pdo->rollBack();
+            return true; // rate limited
+        }
+
+        if ($record) {
+            $pdo->prepare('UPDATE rate_limits SET attempts = attempts + 1, last_attempt = NOW() WHERE id = :id')
+                ->execute([':id' => $record['id']]);
+        } else {
+            $pdo->prepare('INSERT INTO rate_limits (ip_address, action, attempts, first_attempt) VALUES (:identifier, :action, 1, NOW())')
+                ->execute([':identifier' => $identifier, ':action' => 'profile_view']);
+        }
+
+        $pdo->commit();
+        return false; // not rate limited
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        error_log('Profile-view rate limit error: ' . $e->getMessage());
         return false; // fail open on error
     }
 }
