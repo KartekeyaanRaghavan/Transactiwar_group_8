@@ -19,12 +19,12 @@ require_once __DIR__ . '/../config/database.php';
 // Session lifetime in seconds (30 minutes sliding window)
 define('SESSION_LIFETIME', 1800);
 // Absolute session lifetime — user must re-authenticate after this regardless of activity
-define('SESSION_ABSOLUTE_LIFETIME', 28800); // 8 hours
+define('SESSION_ABSOLUTE_LIFETIME', 3600); // 1 hour
 // Token rotation interval — generate a new session token periodically
 // Limits the window an attacker can use a stolen token
 define('TOKEN_ROTATION_INTERVAL', 600); // 10 minutes
 // Maximum concurrent sessions per user (oldest are evicted on new login)
-define('MAX_SESSIONS_PER_USER', 5);
+define('MAX_SESSIONS_PER_USER', 1);
 define('SESSION_COOKIE_NAME', 'TRANSACTIWAR_SID');
 
 /**
@@ -74,8 +74,19 @@ function getClientIP(): string {
  * @param int $userId The user ID
  * @return string The raw session token (to be sent as cookie)
  */
-function createSession(int $userId): string {
+function createSession(int $userId): ?string {
     $pdo = getDBConnection();
+
+    // SECURITY: Reject login if user already has an active session.
+    // Only one concurrent session is allowed per user. This prevents an attacker
+    // from silently evicting a legitimate session by logging in from elsewhere.
+    $countStmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM sessions WHERE user_id = :user_id AND expires_at > NOW()'
+    );
+    $countStmt->execute([':user_id' => $userId]);
+    if ((int)$countStmt->fetchColumn() >= MAX_SESSIONS_PER_USER) {
+        return null;
+    }
 
     // Generate cryptographically secure token
     $token = generateSessionToken();
@@ -100,22 +111,6 @@ function createSession(int $userId): string {
         ':ua_hash'    => $uaHash,
         ':expires_at' => $expiresAt,
     ]);
-
-    // SECURITY: Evict oldest sessions if user exceeds MAX_SESSIONS_PER_USER
-    $countStmt = $pdo->prepare('SELECT COUNT(*) FROM sessions WHERE user_id = :user_id');
-    $countStmt->execute([':user_id' => $userId]);
-    $sessionCount = (int)$countStmt->fetchColumn();
-
-    if ($sessionCount > MAX_SESSIONS_PER_USER) {
-        $evictCount = $sessionCount - MAX_SESSIONS_PER_USER;
-        $evictStmt = $pdo->prepare(
-            'DELETE FROM sessions WHERE user_id = :user_id
-             ORDER BY expires_at ASC LIMIT :evict_count'
-        );
-        $evictStmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
-        $evictStmt->bindValue(':evict_count', $evictCount, PDO::PARAM_INT);
-        $evictStmt->execute();
-    }
 
     // Set the session cookie
     setSessionCookie($token);

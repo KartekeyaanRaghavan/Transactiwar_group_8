@@ -174,8 +174,16 @@ function loginUser(string $username, string $password): array {
     // Clearing on success is exploitable: attacker logs into own account to reset
     // their IP counter, then resumes brute-force against the target account.
 
-    // Create new session
+    // Create new session — returns null if user is already logged in elsewhere
     $token = createSession($user['id']);
+
+    if ($token === null) {
+        return [
+            'success' => false,
+            'error'   => 'This account is already logged in from another location. Please log out first.',
+            'token'   => null,
+        ];
+    }
 
     return ['success' => true, 'error' => null, 'token' => $token];
 }
