@@ -66,6 +66,17 @@ if ($captchaRateLimited) {
 
 // Dedicated session name to avoid conflicts with the app's DB-based session system
 session_name('TWCAP');
+// SECURITY: Harden the CAPTCHA session cookie — mirror the main session cookie flags.
+// Without these, the TWCAP cookie is sent over plain HTTP, exposing the session ID
+// to network-level attackers who could then forge CAPTCHA answers.
+session_set_cookie_params([
+    'lifetime' => 600,          // 10 minutes (matches CAPTCHA_VALIDITY + margin)
+    'path'     => '/',
+    'domain'   => '',
+    'secure'   => true,         // HTTPS only — prevents leakage over HTTP
+    'httponly'  => true,         // No JavaScript access
+    'samesite' => 'Strict',     // No cross-site sending
+]);
 session_start();
 
 // Generate a question with a random operation

@@ -506,7 +506,7 @@ function updateProfile(int $userId, string $email, string $bio): array {
         ]);
         return ['success' => true, 'error' => null];
     } catch (PDOException $e) {
-        if ($e->getCode() == 23000) {
+        if ($e->getCode() === '23000') {
             return ['success' => false, 'error' => 'This email is already in use.'];
         }
         error_log('Profile update error: ' . $e->getMessage());

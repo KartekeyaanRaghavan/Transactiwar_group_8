@@ -77,42 +77,55 @@ function getClientIP(): string {
 function createSession(int $userId): ?string {
     $pdo = getDBConnection();
 
-    // SECURITY: Reject login if user already has an active session.
-    // Only one concurrent session is allowed per user. This prevents an attacker
-    // from silently evicting a legitimate session by logging in from elsewhere.
-    $countStmt = $pdo->prepare(
-        'SELECT COUNT(*) FROM sessions WHERE user_id = :user_id AND expires_at > NOW()'
-    );
-    $countStmt->execute([':user_id' => $userId]);
-    if ((int)$countStmt->fetchColumn() >= MAX_SESSIONS_PER_USER) {
+    // SECURITY: Wrap check + insert in a transaction with FOR UPDATE to prevent
+    // TOCTOU race. Without this, two concurrent login requests could both pass the
+    // COUNT check and both create sessions, bypassing the single-session policy.
+    // InnoDB's gap lock on the user_id FK index ensures the INSERT is also serialised.
+    $pdo->beginTransaction();
+    try {
+        $countStmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM sessions WHERE user_id = :user_id AND expires_at > NOW() FOR UPDATE'
+        );
+        $countStmt->execute([':user_id' => $userId]);
+        if ((int)$countStmt->fetchColumn() >= MAX_SESSIONS_PER_USER) {
+            $pdo->commit();
+            return null;
+        }
+
+        // Generate cryptographically secure token
+        $token = generateSessionToken();
+        $tokenHash = hashSessionToken($token);
+
+        // Generate CSRF token for this session
+        $csrfToken = bin2hex(random_bytes(32));
+
+        $ip = getClientIP();
+        $uaHash = getUserAgentHash();
+        $expiresAt = date('Y-m-d H:i:s', time() + SESSION_LIFETIME);
+
+        $stmt = $pdo->prepare(
+            'INSERT INTO sessions (user_id, session_token_hash, csrf_token, ip_address, user_agent_hash, expires_at)
+             VALUES (:user_id, :token_hash, :csrf_token, :ip, :ua_hash, :expires_at)'
+        );
+        $stmt->execute([
+            ':user_id'    => $userId,
+            ':token_hash' => $tokenHash,
+            ':csrf_token' => $csrfToken,
+            ':ip'         => $ip,
+            ':ua_hash'    => $uaHash,
+            ':expires_at' => $expiresAt,
+        ]);
+
+        $pdo->commit();
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log('Session creation error: ' . $e->getMessage());
         return null;
     }
 
-    // Generate cryptographically secure token
-    $token = generateSessionToken();
-    $tokenHash = hashSessionToken($token);
-
-    // Generate CSRF token for this session
-    $csrfToken = bin2hex(random_bytes(32));
-
-    $ip = getClientIP();
-    $uaHash = getUserAgentHash();
-    $expiresAt = date('Y-m-d H:i:s', time() + SESSION_LIFETIME);
-
-    $stmt = $pdo->prepare(
-        'INSERT INTO sessions (user_id, session_token_hash, csrf_token, ip_address, user_agent_hash, expires_at)
-         VALUES (:user_id, :token_hash, :csrf_token, :ip, :ua_hash, :expires_at)'
-    );
-    $stmt->execute([
-        ':user_id'    => $userId,
-        ':token_hash' => $tokenHash,
-        ':csrf_token' => $csrfToken,
-        ':ip'         => $ip,
-        ':ua_hash'    => $uaHash,
-        ':expires_at' => $expiresAt,
-    ]);
-
-    // Set the session cookie
+    // Set the session cookie (outside transaction — DB state is committed)
     setSessionCookie($token);
 
     return $token;
@@ -203,26 +216,63 @@ function validateSession(): ?array {
     // SECURITY: Rotate session token every 10 minutes
     // Limits the window during which a stolen token remains valid.
     $rotatedAt = strtotime($session['token_rotated_at'] ?? $session['created_at']);
+    $tokenRotated = false;
+
     if (time() - $rotatedAt > TOKEN_ROTATION_INTERVAL) {
-        $newToken = generateSessionToken();
-        $newTokenHash = hashSessionToken($newToken);
+        // SECURITY: Use FOR UPDATE inside a transaction to prevent concurrent rotation race.
+        // Without this, two tabs sending requests simultaneously during the rotation window
+        // can both generate new tokens, but only one UPDATE succeeds — the losing tab's
+        // cookie references a token hash that no longer exists, causing forced logout.
+        $pdo->beginTransaction();
+        try {
+            $lockStmt = $pdo->prepare(
+                'SELECT session_token_hash, token_rotated_at FROM sessions WHERE id = :id FOR UPDATE'
+            );
+            $lockStmt->execute([':id' => $session['id']]);
+            $locked = $lockStmt->fetch();
 
-        $rotateStmt = $pdo->prepare(
-            'UPDATE sessions SET session_token_hash = :new_hash, token_rotated_at = NOW()
-             WHERE session_token_hash = :old_hash'
-        );
-        $rotateStmt->execute([
-            ':new_hash' => $newTokenHash,
-            ':old_hash' => $tokenHash,
-        ]);
+            if (!$locked) {
+                $pdo->rollBack();
+                destroySessionCookie();
+                return null;
+            }
 
-        // Set new cookie with rotated token
-        setSessionCookie($newToken);
-        return $session;
+            // Re-check after acquiring lock — another request may have already rotated
+            $lockedRotatedAt = strtotime($locked['token_rotated_at']);
+            if (time() - $lockedRotatedAt > TOKEN_ROTATION_INTERVAL) {
+                // This request wins the rotation
+                $newToken = generateSessionToken();
+                $newTokenHash = hashSessionToken($newToken);
+
+                $rotateStmt = $pdo->prepare(
+                    'UPDATE sessions SET session_token_hash = :new_hash, token_rotated_at = NOW()
+                     WHERE id = :id'
+                );
+                $rotateStmt->execute([':new_hash' => $newTokenHash, ':id' => $session['id']]);
+                $pdo->commit();
+
+                setSessionCookie($newToken);
+                $tokenRotated = true;
+            } else {
+                // Lost the race — another concurrent request already rotated the token.
+                // Do NOT set any cookie: the old token is now invalid in the DB, and we
+                // don't have the new raw token. The winning request's response carries
+                // the correct Set-Cookie header.
+                $pdo->commit();
+                $tokenRotated = true; // suppress stale cookie refresh below
+            }
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            // Fall through to normal cookie refresh on error
+        }
     }
 
-    // Refresh cookie expiry
-    setSessionCookie($token);
+    if (!$tokenRotated) {
+        // Refresh cookie expiry (only when no rotation occurred)
+        setSessionCookie($token);
+    }
 
     return $session;
 }

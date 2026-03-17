@@ -36,6 +36,14 @@ if (!$user) {
 
 $session['balance'] = $user['balance'];
 
+// SECURITY: Rate limit page requests — each request inserts a nonce row into
+// pending_transfers. Without this, an attacker can flood the table with unbounded
+// rows (cleanup only runs every 5 minutes, rows live ~70 minutes).
+if (checkAndRecordPageViewAttempt($session['user_id'])) {
+    http_response_code(429);
+    exit('Too many requests. Please wait a moment and try again.');
+}
+
 $errorMessage = '';
 $successMessage = '';
 $formData = [

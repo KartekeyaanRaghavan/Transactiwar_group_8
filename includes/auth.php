@@ -108,7 +108,7 @@ function registerUser(string $username, string $email, string $password): array 
         return ['success' => true, 'error' => null, 'user_id' => $userId];
     } catch (PDOException $e) {
         // Handle duplicate key errors (race condition)
-        if ($e->getCode() == 23000) {
+        if ($e->getCode() === '23000') {
             return ['success' => false, 'error' => 'Username or email is already taken.', 'user_id' => null];
         }
         error_log('Registration error: ' . $e->getMessage());
