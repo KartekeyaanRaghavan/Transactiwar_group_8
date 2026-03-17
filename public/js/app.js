@@ -109,6 +109,41 @@ document.addEventListener('DOMContentLoaded', function () {
             this.value = this.value.trim();
         });
     });
+
+    // --- Inactivity Auto-Logout ---
+    // Only runs on authenticated pages (identified by the presence of the
+    // logout form injected by header.php into the navbar).
+    // After 3 minutes of no user interaction, the existing logout POST form
+    // is submitted with an extra `inactivity=1` field so logout.php can
+    // redirect to login with a reason message.
+    var logoutForm = document.querySelector('form[action="/logout.php"]');
+    if (logoutForm) {
+        var INACTIVITY_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+        var inactivityTimer = null;
+
+        function triggerInactivityLogout() {
+            // Inject the inactivity flag — CSRF token is already in the form
+            var flag = document.createElement('input');
+            flag.type  = 'hidden';
+            flag.name  = 'inactivity';
+            flag.value = '1';
+            logoutForm.appendChild(flag);
+            logoutForm.submit();
+        }
+
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(triggerInactivityLogout, INACTIVITY_TIMEOUT_MS);
+        }
+
+        // User activity signals
+        ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'].forEach(function (evt) {
+            document.addEventListener(evt, resetInactivityTimer, { passive: true });
+        });
+
+        // Start the timer on page load
+        resetInactivityTimer();
+    }
 });
 
 /**

@@ -43,6 +43,10 @@ logActivity('logout.php', $session);
 // Destroy the session
 destroySession();
 
-// Redirect to login
-header('Location: /login.php');
+// Redirect to login — pass reason if this was an inactivity logout
+if (isset($_POST['inactivity']) && $_POST['inactivity'] === '1') {
+    header('Location: /login.php?reason=inactivity');
+} else {
+    header('Location: /login.php');
+}
 exit;

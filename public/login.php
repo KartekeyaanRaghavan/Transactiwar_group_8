@@ -36,6 +36,11 @@ if (isset($_GET['registered']) && $_GET['registered'] === '1') {
     $successMessage = 'Account created successfully! You can now login.';
 }
 
+// Check for inactivity logout redirect
+if (isset($_GET['reason']) && $_GET['reason'] === 'inactivity') {
+    $successMessage = 'You were logged out due to inactivity.';
+}
+
 // SECURITY: Check if CAPTCHA is required (>= 3 failed attempts from this IP)
 $clientIP = getClientIP();
 $ipFailures = getRecentFailedAttemptCountByIP($clientIP);
