@@ -56,7 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['q'])) {
     }
 }
 
-logActivity('search.php' . ($searchQuery ? ' (query: ' . sanitizeOutput($searchQuery) . ')' : ''), $session);
+// NOTE: No HTML encoding here — logActivity stores raw data in the DB.
+// HTML encoding (sanitizeOutput) belongs at the output/display layer only.
+// Encoding here would corrupt forensic data (e.g., O'Reilly → O&#039;Reilly).
+logActivity('search.php' . ($searchQuery ? ' (query: ' . $searchQuery . ')' : ''), $session);
 
 $pageTitle = 'Search Users';
 require_once APP_ROOT . '/templates/header.php';

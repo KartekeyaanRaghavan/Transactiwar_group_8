@@ -22,12 +22,12 @@ function setSecurityHeaders(): void {
     header('Referrer-Policy: strict-origin-when-cross-origin');
 
     // SECURITY: HSTS — Force HTTPS for all future requests
-    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
 
     // Content Security Policy: restrict resource loading
     // No 'unsafe-inline' — all styles are in external CSS files
     // Fonts are self-hosted — no external CDN dependencies
-    header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'");
+    header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; upgrade-insecure-requests");
 
     // Permissions policy
     header('Permissions-Policy: camera=(), microphone=(), geolocation=()');

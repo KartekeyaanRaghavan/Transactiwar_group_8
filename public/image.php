@@ -41,7 +41,18 @@ if (!is_file($realPath)) {
 // SECURITY: Force content type — never trust the file extension for serving
 header('Content-Type: image/png');
 header('Content-Length: ' . filesize($realPath));
-header('Cache-Control: max-age=86400, private');
+// SECURITY: Use no-cache + ETag instead of a long max-age so that profile image
+// updates are reflected immediately. The browser revalidates each time but avoids
+// re-downloading if the file hasn't changed (304 Not Modified).
+$etag = '"' . md5($realPath . filemtime($realPath) . filesize($realPath)) . '"';
+header('Cache-Control: no-cache, private');
+header('ETag: ' . $etag);
 header('X-Content-Type-Options: nosniff');
+
+// Return 304 if the client already has the current version
+if (isset($_SERVER['HTTP_IF_NONE_MATCH']) && trim($_SERVER['HTTP_IF_NONE_MATCH']) === $etag) {
+    http_response_code(304);
+    exit;
+}
 
 readfile($realPath);
