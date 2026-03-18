@@ -76,6 +76,7 @@ RUN echo "disable_functions = exec,passthru,shell_exec,system,proc_open,popen,pa
     && echo "log_errors = On" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "error_log = /var/log/php_errors.log" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "session.cookie_httponly = 1" >> /usr/local/etc/php/conf.d/security.ini \
+    && echo "session.cookie_secure = 1" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "session.cookie_samesite = Strict" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "session.use_strict_mode = 1" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "upload_max_filesize = 2M" >> /usr/local/etc/php/conf.d/security.ini \

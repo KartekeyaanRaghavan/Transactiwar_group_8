@@ -174,7 +174,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-logActivity('transfer.php', $session);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    logActivity('transfer.php', $session);
+}
 
 $csrfToken = getCSRFToken($session);
 // SECURITY: Generate HMAC for form tamper-proofing

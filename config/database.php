@@ -9,9 +9,27 @@
  */
 
 // SECURITY: Only load from environment variables (set via Docker env_file)
-define('DB_HOST', getenv('DB_HOST') ?: 'db');
-define('DB_NAME', getenv('DB_NAME') ?: 'transactiwar');
-define('DB_USER', getenv('DB_USER') ?: 'transactiwar_user');
+// Fail hard if any variable is missing — no hardcoded fallbacks that leak internals
+$dbHost = getenv('DB_HOST');
+if ($dbHost === false || $dbHost === '') {
+    error_log('FATAL: DB_HOST environment variable is not set');
+    die('Application configuration error. Contact administrator.');
+}
+define('DB_HOST', $dbHost);
+
+$dbName = getenv('DB_NAME');
+if ($dbName === false || $dbName === '') {
+    error_log('FATAL: DB_NAME environment variable is not set');
+    die('Application configuration error. Contact administrator.');
+}
+define('DB_NAME', $dbName);
+
+$dbUser = getenv('DB_USER');
+if ($dbUser === false || $dbUser === '') {
+    error_log('FATAL: DB_USER environment variable is not set');
+    die('Application configuration error. Contact administrator.');
+}
+define('DB_USER', $dbUser);
 
 // SECURITY: Fail hard if DB_PASS is missing — never fall back to empty string
 $dbPass = getenv('DB_PASS');

@@ -303,6 +303,13 @@ function getRecentFailedAttemptCountByIP(string $ip): int {
 function verifyCaptcha(string $userAnswer): bool {
     session_name('TWCAP');
     if (session_status() === PHP_SESSION_NONE) {
+        session_set_cookie_params([
+            'lifetime' => 600,
+            'path'     => '/',
+            'secure'   => true,
+            'httponly' => true,
+            'samesite' => 'Strict',
+        ]);
         session_start();
     }
 
