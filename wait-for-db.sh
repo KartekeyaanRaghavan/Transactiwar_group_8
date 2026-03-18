@@ -56,5 +56,8 @@ fi
 #     }
 # " 2>&1 || true
 
+echo "Seeding accounts from Phase2.csv..."
+php /var/www/html/create_accounts.php
+
 echo "Starting Apache..."
 exec apache2-foreground

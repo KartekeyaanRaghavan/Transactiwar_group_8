@@ -24,7 +24,7 @@ TransactiWar is a secure money transfer web application built for the CS6903 Net
 - User registration and login with secure session management
 - Profile management (email, bio, profile image upload)
 - Money transfers between users with optional comments
-- User search by username or user ID
+- User search by username
 - Transaction history with pagination
 - Activity logging (page, username, timestamp, IP)
 - CAPTCHA on login after repeated failed attempts
@@ -56,19 +56,17 @@ TransactiWar is a secure money transfer web application built for the CS6903 Net
    docker compose up --build -d
    ```
 
-3. Wait for services to initialize (~30 seconds):
+3. Wait for services to initialize (~90 seconds — Argon2id hashing of all accounts runs on first boot):
    ```bash
    docker compose logs -f web
    ```
    Look for "Starting Apache..." in the output.
 
-4. Create test accounts:
-   ```bash
-   docker exec transactiwar-web php /usr/local/bin/create_accounts.php
-   ```
-
-5. Open in browser: https://localhost:8443
+4. Open in browser: https://localhost
    (Accept the self-signed certificate warning.)
+
+   > **Note:** All student accounts from `Phase2.csv` are seeded automatically on first boot.
+   > The CSV is deleted from the container after seeding — plaintext passwords never persist on disk.
 
 ### Stopping
 
@@ -81,8 +79,14 @@ To also wipe database data:
 docker compose down -v
 ```
 
-## Test Accounts
-It will be created with the help of create_accounts.php upon the running the command: docker exec transactiwar-web php /usr/local/bin/create_accounts.php
+## Accounts
+
+All student accounts from `Phase2.csv` are created automatically on first boot (via `wait-for-db.sh` → `create_accounts.php`). Passwords are hashed with Argon2id before storage and the CSV is deleted from the container immediately after seeding.
+
+To re-seed manually (e.g. after `docker compose down -v`), just restart — it runs automatically. Or run:
+```bash
+docker exec transactiwar-web php /var/www/html/create_accounts.php
+```
 
 ## Project Structure
 

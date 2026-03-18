@@ -1,20 +1,14 @@
 <?php
 /**
- * Account Creation Script
+ * Account Seeding Script
  *
- * Creates test accounts automatically for evaluation purposes.
- * Run this script from the command line:
- *   php create_accounts.php
+ * Reads Phase2.csv, hashes each password with Argon2id, and inserts accounts
+ * into the database. Safe to run multiple times — existing accounts are skipped.
+ * Deletes the CSV after seeding so plaintext passwords do not persist on disk.
  *
- * Or via Docker:
+ * Run automatically on container startup via wait-for-db.sh.
+ * Can also be run manually:
  *   docker exec transactiwar-web php /var/www/html/create_accounts.php
- *
- * Passwords are read from environment variables so they are never
- * hardcoded in the source. Set them before running:
- *
- *   TEST_PASS_ALICE=... TEST_PASS_BOB=... php create_accounts.php
- *
- * If not set, random secure passwords are generated and printed once.
  */
 
 // Prevent web access
@@ -26,82 +20,87 @@ if (php_sapi_name() !== 'cli') {
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/auth.php';
 
-function resolvePassword(string $envKey): string {
-    $val = getenv($envKey);
-    if ($val !== false && $val !== '') {
-        return $val;
-    }
-    // Generate a random password that meets the complexity rules
-    $chars  = 'abcdefghijklmnopqrstuvwxyz';
-    $upper  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    $digits = '0123456789';
-    $special = '!@#$%^&*';
-    $all = $chars . $upper . $digits . $special;
-    $password  = $chars[random_int(0, strlen($chars) - 1)];
-    $password .= $upper[random_int(0, strlen($upper) - 1)];
-    $password .= $digits[random_int(0, strlen($digits) - 1)];
-    $password .= $special[random_int(0, strlen($special) - 1)];
-    for ($i = 0; $i < 8; $i++) {
-        $password .= $all[random_int(0, strlen($all) - 1)];
-    }
-    return str_shuffle($password);
+$csvPath = __DIR__ . '/Phase2.csv';
+
+echo "TransactiWar - Account Seeding\n";
+echo "================================\n\n";
+
+if (!file_exists($csvPath)) {
+    echo "CSV not found — accounts already seeded on a previous run.\n";
+    exit(0);
 }
 
-$accounts = [
-    ['username' => 'alice',   'email' => 'alice@transactiwar.test',   'env' => 'TEST_PASS_ALICE'],
-    ['username' => 'bob',     'email' => 'bob@transactiwar.test',     'env' => 'TEST_PASS_BOB'],
-    ['username' => 'charlie', 'email' => 'charlie@transactiwar.test', 'env' => 'TEST_PASS_CHARLIE'],
-    ['username' => 'dave',    'email' => 'dave@transactiwar.test',    'env' => 'TEST_PASS_DAVE'],
-    ['username' => 'eve',     'email' => 'eve@transactiwar.test',     'env' => 'TEST_PASS_EVE'],
-];
-
-echo "TransactiWar - Account Creation Script\n";
-echo "=======================================\n\n";
+$handle = fopen($csvPath, 'r');
+if ($handle === false) {
+    echo "[ERR] Cannot open Phase2.csv\n";
+    exit(1);
+}
 
 $pdo = getDBConnection();
-$created = [];
+$created = 0;
+$skipped = 0;
+$errors  = 0;
 
-foreach ($accounts as $account) {
-    $stmt = $pdo->prepare('SELECT id FROM users WHERE username = :username');
-    $stmt->execute([':username' => $account['username']]);
+$checkStmt  = $pdo->prepare('SELECT id FROM users WHERE username = :username');
+$insertStmt = $pdo->prepare(
+    'INSERT INTO users (username, email, display_name, password_hash, balance)
+     VALUES (:username, :email, :display_name, :password_hash, 100.00)'
+);
 
-    if ($stmt->fetch()) {
-        echo "[SKIP] User '{$account['username']}' already exists.\n";
+// Skip header row
+fgetcsv($handle);
+
+while (($row = fgetcsv($handle)) !== false) {
+    // Expect: username, email, Name, password
+    if (count($row) < 4) {
+        echo "[WARN] Skipping malformed row: " . implode(',', $row) . "\n";
         continue;
     }
 
-    $password = resolvePassword($account['env']);
+    $username    = trim($row[0]);
+    $email       = trim($row[1]);
+    $displayName = trim($row[2]);
+    $password    = $row[3]; // Do not trim — preserve exact password
 
-    // Hash with Argon2id to match the main application
-    $passwordHash = password_hash($password, PASSWORD_ARGON2ID, ARGON2ID_OPTIONS);
+    if ($username === '' || $email === '' || $password === '') {
+        echo "[WARN] Skipping row with empty required field.\n";
+        continue;
+    }
 
-    $stmt = $pdo->prepare(
-        'INSERT INTO users (username, email, password_hash, balance) VALUES (:username, :email, :password_hash, 100.00)'
-    );
+    $checkStmt->execute([':username' => $username]);
+    if ($checkStmt->fetch()) {
+        echo "[SKIP] {$username} already exists.\n";
+        $skipped++;
+        continue;
+    }
+
+    // Hash with Argon2id — plaintext password is never written to the DB
+    $hash = password_hash($password, PASSWORD_ARGON2ID, ARGON2ID_OPTIONS);
 
     try {
-        $stmt->execute([
-            ':username'      => $account['username'],
-            ':email'         => $account['email'],
-            ':password_hash' => $passwordHash,
+        $insertStmt->execute([
+            ':username'      => $username,
+            ':email'         => $email,
+            ':display_name'  => $displayName !== '' ? $displayName : null,
+            ':password_hash' => $hash,
         ]);
-        $userId = $pdo->lastInsertId();
-        $created[] = ['username' => $account['username'], 'password' => $password];
-        echo "[OK] Created user '{$account['username']}' (ID: {$userId})\n";
+        echo "[OK]   {$username} created (ID: {$pdo->lastInsertId()})\n";
+        $created++;
     } catch (PDOException $e) {
-        echo "[ERROR] Failed to create user '{$account['username']}': {$e->getMessage()}\n";
+        echo "[ERR]  {$username}: {$e->getMessage()}\n";
+        $errors++;
     }
 }
 
-echo "\n=======================================\n";
-echo "Account creation complete!\n";
+fclose($handle);
 
-if (!empty($created)) {
-    echo "\nCredentials (save these now — they will not be shown again):\n";
-    foreach ($created as $c) {
-        echo "  Username: {$c['username']} | Password: {$c['password']}\n";
-    }
+// Delete the CSV so plaintext passwords do not persist in the container
+if (@unlink($csvPath)) {
+    echo "\n[SEC] Phase2.csv deleted from container (passwords hashed and stored).\n";
+} else {
+    echo "\n[WARN] Could not delete Phase2.csv — please remove it manually.\n";
 }
 
-echo "\nEach account starts with Rs. 100.00 balance.\n";
-echo "Change passwords immediately after deployment.\n";
+echo "\n================================\n";
+echo "Done. Created: {$created}, Skipped: {$skipped}, Errors: {$errors}\n";
+echo "Each new account starts with Rs. 100.00 balance.\n";

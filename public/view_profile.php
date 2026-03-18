@@ -94,7 +94,9 @@ require_once APP_ROOT . '/templates/header.php';
 
             <div class="profile-info">
                 <h2><?php echo sanitizeOutput($profileUser['username']); ?></h2>
-                <p class="user-id">User ID: #<?php echo (int) $profileUser['id']; ?></p>
+                <?php if (!empty($profileUser['display_name'])): ?>
+                    <p class="user-display-name"><?php echo sanitizeOutput($profileUser['display_name']); ?></p>
+                <?php endif; ?>
                 <?php if ($isOwnProfile): ?>
                     <!-- SECURITY: Email only visible on own profile (IDOR fix) -->
                     <p class="user-email"><?php echo sanitizeOutput($profileUser['email']); ?></p>

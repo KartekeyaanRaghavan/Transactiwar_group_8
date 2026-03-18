@@ -40,7 +40,6 @@ COPY . /var/www/html/
 # /var/www/html, so PHP can read these unless explicitly removed).
 RUN rm -f /var/www/html/wait-for-db.sh \
           /var/www/html/init.sql \
-          /var/www/html/create_accounts.php \
           /var/www/html/Dockerfile \
           /var/www/html/docker-compose.yml \
           /var/www/html/apache.conf \

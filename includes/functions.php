@@ -15,7 +15,7 @@ require_once __DIR__ . '/validation.php';
 function getUserById(int $userId): ?array {
     $pdo = getDBConnection();
     $stmt = $pdo->prepare(
-        'SELECT id, username, email, balance, bio, profile_image, created_at, updated_at
+        'SELECT id, username, display_name, email, balance, bio, profile_image, created_at, updated_at
          FROM users WHERE id = :id LIMIT 1'
     );
     $stmt->execute([':id' => $userId]);
@@ -24,39 +24,49 @@ function getUserById(int $userId): ?array {
 }
 
 /**
- * Search users by username or user ID.
- * SECURITY: Results limited to prevent data enumeration through UNION-style attacks.
+ * Count total users matching a search query.
+ * Used to calculate pagination totals without fetching all rows.
  *
- * @param string $query Search query
- * @param int    $limit Max results to return (default 5)
+ * @param string $query Search query (plain, not yet LIKE-escaped)
+ * @return int Total matching user count
+ */
+function countSearchResults(string $query): int {
+    $pdo = getDBConnection();
+    $escapedQuery = str_replace(['%', '_'], ['\\%', '\\_'], $query);
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM users WHERE username LIKE :query');
+    $stmt->bindValue(':query', '%' . $escapedQuery . '%', PDO::PARAM_STR);
+    $stmt->execute();
+    return (int) $stmt->fetchColumn();
+}
+
+/**
+ * Search users by username (partial match).
+ * SECURITY: Results limited to prevent data enumeration.
+ * SECURITY: No email or balance returned — only non-sensitive display fields.
+ * SECURITY: Search is username-only (no numeric ID lookup) to prevent sequential
+ *           user enumeration by guessing integer IDs.
+ *
+ * @param string $query  Search query
+ * @param int    $limit  Results per page (default 5)
+ * @param int    $offset Row offset for pagination (default 0)
  * @return array List of matching users (only non-sensitive fields)
  */
-function searchUsers(string $query, int $limit = 5): array {
+function searchUsers(string $query, int $limit = 5, int $offset = 0): array {
     $pdo = getDBConnection();
 
-    // Check if query is a numeric user ID
-    if (ctype_digit($query)) {
-        $stmt = $pdo->prepare(
-            'SELECT id, username, profile_image
-             FROM users WHERE id = :id LIMIT 1'
-        );
-        $stmt->execute([':id' => (int) $query]);
-        $result = $stmt->fetch();
-        return $result ? [$result] : [];
-    }
-
-    // Search by username (partial match)
-    // SECURITY: Using prepared statements with LIKE and parameter binding
-    // SECURITY: Not returning email in search results to prevent enumeration
-    $stmt = $pdo->prepare(
-        'SELECT id, username, profile_image
-         FROM users WHERE username LIKE :query
-         ORDER BY username ASC LIMIT :limit'
-    );
     // SECURITY: Escape LIKE wildcards in user input to prevent wildcard injection
     $escapedQuery = str_replace(['%', '_'], ['\\%', '\\_'], $query);
-    $stmt->bindValue(':query', '%' . $escapedQuery . '%', PDO::PARAM_STR);
-    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+
+    // SECURITY: Using prepared statements with LIKE and parameter binding
+    // SECURITY: Not returning email, balance, or password_hash in search results
+    $stmt = $pdo->prepare(
+        'SELECT id, username, display_name, profile_image
+         FROM users WHERE username LIKE :query
+         ORDER BY username ASC LIMIT :limit OFFSET :offset'
+    );
+    $stmt->bindValue(':query',  '%' . $escapedQuery . '%', PDO::PARAM_STR);
+    $stmt->bindValue(':limit',  $limit,  PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
 
     return $stmt->fetchAll();

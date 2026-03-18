@@ -923,6 +923,19 @@ tr:last-child td {
     font-size: 0.85rem;
 }
 
+.pagination .btn-disabled {
+    opacity: 0.4;
+    cursor: default;
+    pointer-events: none;
+}
+
+.pagination-ellipsis {
+    display: flex;
+    align-items: center;
+    padding: 0 0.25rem;
+    color: var(--text-muted);
+}
+
 /* --- Scrollbar Styling --- */
 ::-webkit-scrollbar {
     width: 8px;

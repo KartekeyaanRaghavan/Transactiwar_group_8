@@ -58,7 +58,9 @@ require_once APP_ROOT . '/templates/header.php';
 
         <div class="profile-info">
             <h2><?php echo sanitizeOutput($user['username']); ?></h2>
-            <p class="user-id">User ID: #<?php echo (int) $user['id']; ?></p>
+            <?php if (!empty($user['display_name'])): ?>
+                <p class="user-display-name"><?php echo sanitizeOutput($user['display_name']); ?></p>
+            <?php endif; ?>
             <p class="user-email"><?php echo sanitizeOutput($user['email']); ?></p>
         </div>
     </div>
