@@ -150,6 +150,12 @@ function validateAmount($amount, $maxBalance): array {
         return ['valid' => false, 'error' => 'Amount must be a valid number.', 'amount' => '0.00'];
     }
 
+    // SECURITY: Reject scientific notation (e.g. 1e1, 2E10) — is_numeric() accepts it but
+    // it is not a valid currency input format and can be used to obfuscate amounts.
+    if (!preg_match('/\A[0-9]+(\.[0-9]{1,2})?\z/', (string)$amount)) {
+        return ['valid' => false, 'error' => 'Amount must be a plain decimal number.', 'amount' => '0.00'];
+    }
+
     // SECURITY FIX: Never use floats for financial comparisons. Use integer cents.
     $amountCents = toCents($amount);
     $maxCents = toCents($maxBalance);
