@@ -30,7 +30,7 @@ if ($currentUser) {
     $session['balance'] = $currentUser['balance'];
 }
 
-define('SEARCH_PER_PAGE', 5);
+define('SEARCH_PER_PAGE', 15);
 define('SEARCH_MAX_PAGE', 500); // prevents absurdly large OFFSET values
 
 $searchQuery = '';
