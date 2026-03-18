@@ -88,8 +88,9 @@ function createSession(int $userId): ?string {
         );
         $countStmt->execute([':user_id' => $userId]);
         if ((int)$countStmt->fetchColumn() >= MAX_SESSIONS_PER_USER) {
-            $pdo->commit();
-            return null;
+            // Evict all existing sessions — new login takes priority over old sessions
+            $pdo->prepare('DELETE FROM sessions WHERE user_id = :user_id')
+                ->execute([':user_id' => $userId]);
         }
 
         // Generate cryptographically secure token

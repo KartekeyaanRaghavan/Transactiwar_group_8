@@ -166,13 +166,13 @@ function loginUser(string $username, string $password): array {
     // Clearing on success is exploitable: attacker logs into own account to reset
     // their IP counter, then resumes brute-force against the target account.
 
-    // Create new session — returns null if user is already logged in elsewhere
+    // Create new session — evicts any existing sessions for this user first
     $token = createSession($user['id']);
 
     if ($token === null) {
         return [
             'success' => false,
-            'error'   => 'This account is already logged in from another location. Please log out first.',
+            'error'   => 'Login failed due to a server error. Please try again.',
             'token'   => null,
         ];
     }
@@ -237,7 +237,7 @@ function checkAndRecordLoginAttempt(string $ip, string $username): bool {
     } catch (PDOException $e) {
         $pdo->rollBack();
         error_log('Login rate limit error: ' . $e->getMessage());
-        return false; // fail open on error
+        return true; // fail closed — DB error must not bypass login protection
     }
 }
 
@@ -360,6 +360,6 @@ function checkAndRecordRegisterAttempt(string $ip): bool {
     } catch (PDOException $e) {
         $pdo->rollBack();
         error_log('Registration rate limit error: ' . $e->getMessage());
-        return false; // fail open on error
+        return true; // fail closed — DB error must not bypass registration protection
     }
 }

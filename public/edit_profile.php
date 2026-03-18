@@ -32,6 +32,11 @@ if (!$user) {
     exit;
 }
 
+if (checkAndRecordPageViewAttempt($session['user_id'])) {
+    http_response_code(429);
+    die('Too many requests. Please slow down.');
+}
+
 $session['balance'] = $user['balance'];
 
 $errorMessage = '';

@@ -115,7 +115,7 @@ function checkAndRecordSearchAttempt(string $ip): bool {
     } catch (PDOException $e) {
         $pdo->rollBack();
         error_log('Search rate limit error: ' . $e->getMessage());
-        return false; // fail open on error
+        return true; // fail closed — DB error must not bypass search protection
     }
 }
 
@@ -171,7 +171,7 @@ function checkAndRecordUploadAttempt(int $userId): bool {
     } catch (PDOException $e) {
         $pdo->rollBack();
         error_log('Upload rate limit error: ' . $e->getMessage());
-        return false; // fail open on error
+        return true; // fail closed — DB error must not bypass upload protection
     }
 }
 
@@ -219,7 +219,7 @@ function checkAndRecordTransferAttempt(int $userId): bool {
     } catch (PDOException $e) {
         $pdo->rollBack();
         error_log('Transfer rate limit error: ' . $e->getMessage());
-        return false; // fail open on error
+        return true; // fail closed — DB error must not bypass transfer protection
     }
 }
 
@@ -325,7 +325,7 @@ function checkAndRecordProfileViewAttempt(int $userId): bool {
     } catch (PDOException $e) {
         $pdo->rollBack();
         error_log('Profile-view rate limit error: ' . $e->getMessage());
-        return false; // fail open on error
+        return true; // fail closed — DB error must not bypass enumeration protection
     }
 }
 
