@@ -83,7 +83,7 @@ RUN echo "disable_functions = exec,passthru,shell_exec,system,proc_open,popen,pa
     && echo "post_max_size = 3M" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "max_input_time = 30" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "max_execution_time = 30" >> /usr/local/etc/php/conf.d/security.ini \
-    && echo "memory_limit = 64M" >> /usr/local/etc/php/conf.d/security.ini \
+    && echo "memory_limit = 256M" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "open_basedir = /var/www/html:/var/www/uploads:/tmp" >> /usr/local/etc/php/conf.d/security.ini
 
 # Copy the wait-for-db script
