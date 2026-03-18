@@ -46,7 +46,8 @@ RUN rm -f /var/www/html/wait-for-db.sh \
           /var/www/html/.dockerignore \
           /var/www/html/.gitignore \
           /var/www/html/toDo.txt \
-          /var/www/html/Transactiwar.docx
+          /var/www/html/Transactiwar.docx && \
+    rm -rf /var/www/html/.git /var/www/html/.github
 
 # Set the document root to the public directory
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
