@@ -34,9 +34,20 @@ COPY apache.conf /etc/apache2/sites-available/000-default.conf
 
 # Copy application code
 COPY . /var/www/html/
-# SECURITY: Remove infrastructure script from the web root — pulled in by the bulk
-# COPY above. The canonical copy lives at /usr/local/bin/ (copied explicitly below).
-RUN rm -f /var/www/html/wait-for-db.sh
+# SECURITY: Remove infrastructure and dev files from the web root — pulled in by
+# the bulk COPY above. These are not needed at runtime and must not be readable
+# via any PHP include or path traversal vulnerability (open_basedir covers
+# /var/www/html, so PHP can read these unless explicitly removed).
+RUN rm -f /var/www/html/wait-for-db.sh \
+          /var/www/html/init.sql \
+          /var/www/html/create_accounts.php \
+          /var/www/html/Dockerfile \
+          /var/www/html/docker-compose.yml \
+          /var/www/html/apache.conf \
+          /var/www/html/.dockerignore \
+          /var/www/html/.gitignore \
+          /var/www/html/toDo.txt \
+          /var/www/html/Transactiwar.docx
 
 # Set the document root to the public directory
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public

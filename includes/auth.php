@@ -148,18 +148,10 @@ function loginUser(string $username, string $password): array {
         // username enumeration. Hash format: m=65536,t=4,p=2 (matches ARGON2ID_OPTIONS).
         password_verify($password, '$argon2id$v=19$m=65536,t=4,p=2$YWJjZGVmZ2hpamtsbW5vcA$YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY');
 
-        // SECURITY: Progressive delay — slows down brute-force attacks
-        $attempts = getRecentFailedAttemptCount($ip, $username);
-        sleep(min($attempts, 5));
-
         return ['success' => false, 'error' => 'Invalid username or password.', 'token' => null];
     }
 
     if (!password_verify($password, $user['password_hash'])) {
-        // SECURITY: Progressive delay — slows down brute-force attacks
-        $attempts = getRecentFailedAttemptCount($ip, $username);
-        sleep(min($attempts, 5));
-
         return ['success' => false, 'error' => 'Invalid username or password.', 'token' => null];
     }
 
