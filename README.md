@@ -64,7 +64,7 @@ TransactiWar is a secure money transfer web application built for the CS6903 Net
 
 4. Create test accounts:
    ```bash
-   docker exec transactiwar-web php /var/www/html/create_accounts.php
+   docker exec transactiwar-web php /usr/local/bin/create_accounts.php
    ```
 
 5. Open in browser: https://localhost:8443
@@ -82,7 +82,7 @@ docker compose down -v
 ```
 
 ## Test Accounts
-It will be created with the help of create_accounts.php upon the running the command: docker exec transactiwar-web php /var/www/html/create_accounts.php
+It will be created with the help of create_accounts.php upon the running the command: docker exec transactiwar-web php /usr/local/bin/create_accounts.php
 
 ## Project Structure
 

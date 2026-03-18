@@ -48,6 +48,7 @@ $etag = '"' . md5($realPath . filemtime($realPath) . filesize($realPath)) . '"';
 header('Cache-Control: no-cache, private');
 header('ETag: ' . $etag);
 header('X-Content-Type-Options: nosniff');
+header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
 
 // Return 304 if the client already has the current version
 if (isset($_SERVER['HTTP_IF_NONE_MATCH']) && trim($_SERVER['HTTP_IF_NONE_MATCH']) === $etag) {

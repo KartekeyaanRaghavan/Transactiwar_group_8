@@ -12,6 +12,10 @@
 
 define('APP_ROOT', dirname(__DIR__));
 
+// SECURITY: Send HSTS on every response — even image endpoints — so that the
+// browser's HSTS cache is populated regardless of which URL is hit first.
+header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
+
 require_once APP_ROOT . '/config/database.php';
 
 // SECURITY: Rate limit captcha generation per IP to prevent DoS
