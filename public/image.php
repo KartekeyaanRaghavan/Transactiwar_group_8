@@ -11,6 +11,13 @@
  * - Content-Type forced to image/png regardless of filename
  */
 
+define('APP_ROOT', dirname(__DIR__));
+
+require_once APP_ROOT . '/includes/session.php';
+
+// SECURITY: Require authentication before serving any profile image
+requireAuth();
+
 define('UPLOAD_DIR', '/var/www/uploads/profiles/');
 
 $file = $_GET['file'] ?? '';
