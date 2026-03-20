@@ -21,3 +21,4 @@ Thumbs.db
 *.swo
 Transactiwar.docx
 scripts/*
+.env
